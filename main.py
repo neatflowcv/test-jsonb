@@ -2,7 +2,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
-from model import Base, User, Product
+from model import Base, Character
+import json
+from pathlib import Path
 
 # 환경 변수 로드
 load_dotenv()
@@ -31,204 +33,229 @@ def get_engine():
 
 
 def create_sample_data(session):
-    """샘플 데이터 생성"""
+    """examples 디렉토리의 JSON 파일들을 로드하고 데이터베이스에 삽입"""
+    print("📁 examples 디렉토리에서 JSON 파일들을 로드합니다...")
 
-    # 사용자 데이터 생성
-    users_data = [
-        {
-            "name": "김철수",
-            "profile": {
-                "age": 28,
-                "email": "kim@example.com",
-                "address": {"city": "서울", "district": "강남구", "zipcode": "06292"},
-                "hobbies": ["독서", "영화감상", "프로그래밍"],
-                "is_active": True,
-            },
-            "settings": {
-                "theme": "dark",
-                "language": "ko",
-                "notifications": {"email": True, "push": False, "sms": True},
-            },
-        },
-        {
-            "name": "이영희",
-            "profile": {
-                "age": 25,
-                "email": "lee@example.com",
-                "address": {"city": "부산", "district": "해운대구", "zipcode": "48094"},
-                "hobbies": ["요리", "등산", "사진"],
-                "is_active": True,
-            },
-            "settings": {
-                "theme": "light",
-                "language": "ko",
-                "notifications": {"email": False, "push": True, "sms": False},
-            },
-        },
-    ]
+    # examples 디렉토리의 모든 JSON 파일 찾기
+    examples_dir = Path("examples")
+    json_files = examples_dir.glob("*.json")
 
-    for user_data in users_data:
-        user = User(**user_data)
-        session.add(user)
+    characters_added = 0
 
-    # 제품 데이터 생성
-    products_data = [
-        {
-            "name": "노트북",
-            "product_info": {
-                "category": "전자제품",
-                "price": 1500000,
-                "specs": {"cpu": "Intel i7", "ram": "16GB", "storage": "512GB SSD"},
-                "tags": ["고성능", "업무용", "게임"],
-                "ratings": [5, 4, 5, 4, 5],
-                "available": True,
-            },
-        },
-        {
-            "name": "스마트폰",
-            "product_info": {
-                "category": "전자제품",
-                "price": 800000,
-                "specs": {"screen": "6.1인치", "camera": "48MP", "battery": "4000mAh"},
-                "tags": ["휴대폰", "카메라", "통신"],
-                "ratings": [4, 5, 4, 4, 5],
-                "available": True,
-            },
-        },
-    ]
+    for json_file in json_files:
+        try:
+            # JSON 파일 읽기
+            with open(json_file, "r", encoding="utf-8") as f:
+                profile_data = json.load(f)
 
-    for product_data in products_data:
-        product = Product(**product_data)
-        session.add(product)
+            # 파일명에서 캐릭터 이름 추출 (확장자 제거)
+            character_name = json_file.stem
 
+            print(f"  📊 {character_name} 캐릭터 데이터 처리 중...")
+
+            # Character 객체 생성
+            character = Character(name=character_name, profile=profile_data)
+
+            # 데이터베이스에 추가
+            session.add(character)
+            characters_added += 1
+
+            print(f"    ✅ {character_name} 캐릭터 추가 완료!")
+
+        except Exception as e:
+            print(f"    ❌ {json_file.name} 파일 처리 중 오류: {e}")
+            continue
+
+    # 변경사항 커밋
     session.commit()
+    print(f"✅ 총 {characters_added}개 캐릭터 데이터가 성공적으로 삽입되었습니다!")
     print("✅ 샘플 데이터 생성 완료!")
 
 
 def jsonb_query_examples(session):
     """JSON 쿼리 예제들 (데이터베이스 호환성 고려)"""
-
     print("\n" + "=" * 50)
     print("🔍 JSON 쿼리 예제들")
     print("=" * 50)
 
-    # 1. Python에서 JSON 필터링 - 나이가 25인 사용자 찾기
-    print("\n1️⃣ 나이가 25인 사용자 찾기:")
-    users = session.query(User).all()
-    filtered_users = [user for user in users if user.profile.get("age") == 25]
-    for user in filtered_users:
-        print(f"   👤 {user.name}: 나이 {user.profile['age']}")
+    # 1. 모든 캐릭터 목록 조회
+    print("\n1️⃣ 모든 캐릭터 목록:")
+    characters = session.query(Character).all()
+    for char in characters:
+        armory = char.profile.get("ArmoryProfile", {})
+        char_name = armory.get("CharacterName", char.name)
+        char_class = armory.get("CharacterClassName", "Unknown")
+        char_level = armory.get("CharacterLevel", "Unknown")
+        server = armory.get("ServerName", "Unknown")
+        print(f"  📋 {char_name} ({char_class} Lv.{char_level}) - {server} 서버")
 
-    # 2. 중첩된 JSON 데이터 쿼리 - 서울에 사는 사용자
-    print("\n2️⃣ 서울에 사는 사용자 찾기:")
-    users = session.query(User).all()
-    seoul_users = [
-        user for user in users if user.profile.get("address", {}).get("city") == "서울"
-    ]
-    for user in seoul_users:
-        address = user.profile["address"]
-        print(f"   🏠 {user.name}: {address['city']} {address['district']}")
+    # 2. 특정 캐릭터의 상세 정보 조회
+    print("\n2️⃣ '하데스' 캐릭터 상세 정보:")
+    hades = session.query(Character).filter(Character.name == "하데스").first()
+    if hades:
+        armory = hades.profile.get("ArmoryProfile", {})
+        print(f"  🎭 캐릭터명: {armory.get('CharacterName')}")
+        print(f"  ⚔️ 직업: {armory.get('CharacterClassName')}")
+        print(f"  📊 레벨: {armory.get('CharacterLevel')}")
+        print(f"  💪 전투력: {armory.get('CombatPower')}")
+        print(f"  🏰 원정대 레벨: {armory.get('ExpeditionLevel')}")
+        print(f"  🌍 서버: {armory.get('ServerName')}")
 
-    # 3. JSON 배열 쿼리 - 취미에 '프로그래밍'이 포함된 사용자
-    print("\n3️⃣ 취미에 '프로그래밍'이 포함된 사용자 찾기:")
-    users = session.query(User).all()
-    programming_users = [
-        user for user in users if "프로그래밍" in user.profile.get("hobbies", [])
-    ]
-    for user in programming_users:
-        hobbies = ", ".join(user.profile["hobbies"])
-        print(f"   🎯 {user.name}: 취미 - {hobbies}")
+        # 스탯 정보
+        stats = armory.get("Stats", [])
+        print("  📈 주요 스탯:")
+        for stat in stats[:4]:  # 처음 4개 스탯만 표시
+            print(f"    - {stat.get('Type')}: {stat.get('Value')}")
 
-    # 4. JSON 키 존재 여부 확인
-    print("\n4️⃣ 설정에 'theme' 키가 있는 사용자:")
-    users = session.query(User).all()
-    theme_users = [user for user in users if "theme" in user.settings]
-    for user in theme_users:
-        theme = user.settings.get("theme", "N/A")
-        print(f"   🎨 {user.name}: 테마 - {theme}")
+    # 3. JSON 경로를 이용한 쿼리 (데이터베이스별 호환성 고려)
+    print("\n3️⃣ JSON 경로 쿼리 예제:")
+    try:
+        # PostgreSQL JSONB 쿼리 (SQLite에서는 작동하지 않을 수 있음)
 
-    # 5. 복잡한 조건 쿼리 - 가격이 1,000,000원 이상이고 사용 가능한 제품
-    print("\n5️⃣ 가격이 1,000,000원 이상이고 사용 가능한 제품:")
-    products = session.query(Product).all()
-    expensive_products = [
-        product
-        for product in products
-        if (
-            product.product_info.get("price", 0) >= 1000000
-            and product.product_info.get("available", False)
+        # 모든 캐릭터의 직업 정보만 추출
+        print("  🔍 모든 캐릭터의 직업:")
+        for char in characters:
+            armory = char.profile.get("ArmoryProfile", {})
+            char_name = armory.get("CharacterName", char.name)
+            char_class = armory.get("CharacterClassName", "Unknown")
+            print(f"    - {char_name}: {char_class}")
+
+    except Exception as e:
+        print(f"  ⚠️ JSON 경로 쿼리 오류: {e}")
+
+    # 4. 장비 정보 조회
+    print("\n4️⃣ 캐릭터 장비 정보:")
+    for char in characters:
+        armory = char.profile.get("ArmoryProfile", {})
+        char_name = armory.get("CharacterName", char.name)
+        equipment = armory.get("ArmoryEquipment", [])
+
+        print(f"  ⚔️ {char_name}의 주요 장비:")
+        weapon = next((item for item in equipment if item.get("Type") == "무기"), None)
+        if weapon:
+            print(f"    🗡️ 무기: {weapon.get('Name')} ({weapon.get('Grade')})")
+
+        armor_count = len(
+            [
+                item
+                for item in equipment
+                if item.get("Type") in ["투구", "상의", "하의", "장갑", "어깨"]
+            ]
         )
-    ]
-    for product in expensive_products:
-        price = product.product_info["price"]
-        category = product.product_info["category"]
-        print(f"   💰 {product.name}: {price:,}원 ({category})")
-
-    # 6. JSON 배열 요소 검색 - 평점에 5점이 포함된 제품
-    print("\n6️⃣ 평점에 5점이 포함된 제품:")
-    products = session.query(Product).all()
-    five_star_products = [
-        product for product in products if 5 in product.product_info.get("ratings", [])
-    ]
-    for product in five_star_products:
-        ratings = product.product_info["ratings"]
-        avg_rating = sum(ratings) / len(ratings)
-        print(f"   ⭐ {product.name}: 평균 {avg_rating:.1f}점 (최고 5점)")
-
-    # 7. JSON 데이터 통계 분석
-    print("\n7️⃣ JSON 데이터 통계 분석:")
-    users = session.query(User).all()
-    ages = [user.profile.get("age", 0) for user in users]
-    avg_age = sum(ages) / len(ages) if ages else 0
-    print(f"   📊 평균 나이: {avg_age:.1f}세")
-
-    cities = [user.profile.get("address", {}).get("city", "") for user in users]
-    city_count = {}
-    for city in cities:
-        if city:
-            city_count[city] = city_count.get(city, 0) + 1
-    print(f"   🏙️ 도시별 사용자 수: {city_count}")
+        accessory_count = len(
+            [
+                item
+                for item in equipment
+                if item.get("Type") in ["목걸이", "귀걸이", "반지"]
+            ]
+        )
+        print(f"    🛡️ 방어구: {armor_count}개, 💍 악세서리: {accessory_count}개")
 
 
 def json_update_examples(session):
     """JSON 업데이트 예제들"""
-
     print("\n" + "=" * 50)
-    print("✏️  JSON 업데이트 예제들")
+    print("✏️ JSON 업데이트 예제들")
     print("=" * 50)
 
-    # 1. JSON 필드 일부 업데이트
-    print("\n1️⃣ 사용자 나이 업데이트:")
-    user = session.query(User).filter(User.name == "김철수").first()
-    if user:
-        old_age = user.profile["age"]
-        # JSON 객체 수정
-        user.profile = {**user.profile, "age": 29}
-        session.commit()
-        print(f"   👤 {user.name}: {old_age}세 → {user.profile['age']}세")
+    # 1. 새로운 필드 추가
+    print("\n1️⃣ 캐릭터에 마지막 로그인 시간 추가:")
+    from datetime import datetime
 
-    # 2. 중첩된 JSON 객체 업데이트
-    print("\n2️⃣ 알림 설정 업데이트:")
-    user = session.query(User).filter(User.name == "이영희").first()
-    if user:
-        # 중첩된 객체 수정
-        new_settings = user.settings.copy()
-        new_settings["notifications"]["email"] = True
-        new_settings["notifications"]["push"] = False
-        user.settings = new_settings
-        session.commit()
-        notifications = user.settings["notifications"]
-        print(f"   📧 {user.name}: 이메일 알림 활성화 - {notifications}")
+    hades = session.query(Character).filter(Character.name == "하데스").first()
+    if hades:
+        # 기존 프로필 데이터 복사
+        updated_profile = hades.profile.copy()
 
-    # 3. JSON 배열에 요소 추가
-    print("\n3️⃣ 취미 추가:")
-    user = session.query(User).filter(User.name == "김철수").first()
-    if user:
-        old_hobbies = user.profile["hobbies"].copy()
-        new_profile = user.profile.copy()
-        new_profile["hobbies"] = old_hobbies + ["운동"]
-        user.profile = new_profile
-        session.commit()
-        print(f"   🎯 {user.name}: 취미 추가 - {user.profile['hobbies']}")
+        # 새로운 필드 추가
+        updated_profile["LastLoginTime"] = datetime.now().isoformat()
+        updated_profile["GameVersion"] = "2.0.1"
+        updated_profile["CustomNote"] = "강력한 슬레이어 캐릭터"
+
+        # 프로필 업데이트
+        hades.profile = updated_profile
+
+        print(f"  ✅ {hades.name}에 새로운 필드들이 추가되었습니다:")
+        print(f"    - LastLoginTime: {updated_profile['LastLoginTime']}")
+        print(f"    - GameVersion: {updated_profile['GameVersion']}")
+        print(f"    - CustomNote: {updated_profile['CustomNote']}")
+
+    # 2. 중첩된 JSON 데이터 수정
+    print("\n2️⃣ 캐릭터 타이틀 변경:")
+    huttal = session.query(Character).filter(Character.name == "후탈").first()
+    if huttal:
+        # 기존 프로필 데이터 복사
+        updated_profile = huttal.profile.copy()
+
+        # ArmoryProfile 내의 Title 수정
+        if "ArmoryProfile" in updated_profile:
+            original_title = updated_profile["ArmoryProfile"].get("Title", "None")
+            updated_profile["ArmoryProfile"]["Title"] = "최강의 전사"
+            updated_profile["ArmoryProfile"]["CustomRank"] = "S급"
+
+            huttal.profile = updated_profile
+
+            print(f"  ✅ {huttal.name}의 타이틀이 변경되었습니다:")
+            print(f"    - 이전: {original_title}")
+            print(f"    - 현재: {updated_profile['ArmoryProfile']['Title']}")
+            print(
+                f"    - 새로운 등급: {updated_profile['ArmoryProfile']['CustomRank']}"
+            )
+
+    # 3. 배열 데이터에 새 항목 추가
+    print("\n3️⃣ 캐릭터 성향에 새로운 항목 추가:")
+    harisona = session.query(Character).filter(Character.name == "해리소나").first()
+    if harisona:
+        # 기존 프로필 데이터 복사
+        updated_profile = harisona.profile.copy()
+
+        # Tendencies 배열에 새 항목 추가
+        if (
+            "ArmoryProfile" in updated_profile
+            and "Tendencies" in updated_profile["ArmoryProfile"]
+        ):
+            tendencies = updated_profile["ArmoryProfile"]["Tendencies"]
+
+            # 새로운 성향 추가
+            new_tendency = {"Type": "행운", "Point": 777, "MaxPoint": 1000}
+            tendencies.append(new_tendency)
+
+            harisona.profile = updated_profile
+
+            print(f"  ✅ {harisona.name}에 새로운 성향이 추가되었습니다:")
+            print(f"    - 타입: {new_tendency['Type']}")
+            print(f"    - 포인트: {new_tendency['Point']}/{new_tendency['MaxPoint']}")
+
+    # 4. 조건부 업데이트
+    print("\n4️⃣ 조건부 업데이트 (높은 레벨 캐릭터에 VIP 상태 추가):")
+    all_characters = session.query(Character).all()
+    vip_count = 0
+
+    for char in all_characters:
+        armory = char.profile.get("ArmoryProfile", {})
+        char_level = armory.get("CharacterLevel", 0)
+        char_name = armory.get("CharacterName", char.name)
+
+        if char_level >= 70:  # 70레벨 이상인 캐릭터
+            updated_profile = char.profile.copy()
+            updated_profile["VIP_Status"] = True
+            updated_profile["VIP_Since"] = datetime.now().isoformat()
+            updated_profile["Benefits"] = [
+                "경험치 보너스 +20%",
+                "골드 보너스 +15%",
+                "특별 이벤트 참여 가능",
+            ]
+
+            char.profile = updated_profile
+            vip_count += 1
+
+            print(f"  ⭐ {char_name} (Lv.{char_level})에게 VIP 상태가 부여되었습니다!")
+
+    print(f"  ✅ 총 {vip_count}명의 캐릭터가 VIP로 업그레이드되었습니다!")
+
+    # 변경사항 커밋
+    session.commit()
+    print("\n💾 모든 업데이트가 데이터베이스에 저장되었습니다!")
 
 
 def main():
@@ -248,8 +275,7 @@ def main():
 
     try:
         # 기존 데이터 삭제 (예제용)
-        session.query(User).delete()
-        session.query(Product).delete()
+        session.query(Character).delete()
         session.commit()
 
         # 샘플 데이터 생성

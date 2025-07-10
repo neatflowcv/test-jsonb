@@ -1,5 +1,5 @@
-from typing import Annotated, Optional
-from sqlalchemy import Integer, String, JSON, TypeDecorator
+from typing import Annotated
+from sqlalchemy import String, JSON, TypeDecorator
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -24,18 +24,8 @@ class CompatibleJSON(TypeDecorator):
 
 
 # JSON을 사용하는 모델 정의 (SQLAlchemy 2.0 스타일)
-class User(Base):
-    __tablename__ = "users"
+class Character(Base):
+    __tablename__ = "characters"
 
-    id: Mapped[Annotated[int, mapped_column(Integer, primary_key=True)]]
-    name: Mapped[Annotated[str, mapped_column(String(100), nullable=False)]]
-    profile: Mapped[Annotated[Optional[dict], mapped_column(CompatibleJSON)]]  # 호환 JSON 필드
-    settings: Mapped[Annotated[Optional[dict], mapped_column(CompatibleJSON)]]  # 또 다른 호환 JSON 필드
-
-
-class Product(Base):
-    __tablename__ = "products"
-
-    id: Mapped[Annotated[int, mapped_column(Integer, primary_key=True)]]
-    name: Mapped[Annotated[str, mapped_column(String(100), nullable=False)]]
-    product_info: Mapped[Annotated[Optional[dict], mapped_column(CompatibleJSON)]]  # 제품 정보를 호환 JSON으로 저장
+    name: Mapped[Annotated[str, mapped_column(String(), primary_key=True)]]
+    profile: Mapped[Annotated[dict, mapped_column(CompatibleJSON)]]
