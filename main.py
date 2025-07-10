@@ -15,7 +15,7 @@ def get_engine():
     # PostgreSQL 연결 (JSONB를 위해 권장)
     # 환경 변수에서 DATABASE_URL을 읽거나 기본값 사용
     database_url = os.getenv(
-        "DATABASE_URL", "postgresql://username:password@localhost/jsonb_test"
+        "DATABASE_URL", "postgresql://myuser:mypassword@127.0.0.1/mydb"
     )
 
     try:
@@ -111,15 +111,15 @@ def jsonb_query_examples(session):
     print("\n3️⃣ JSON 경로 쿼리 예제:")
     try:
         # SQLite
-        filtered_characters = session.query(Character).filter(
-            func.json_extract(Character.profile, "$.ArmoryProfile.CharacterClassName")
-            == "리퍼"
-        ).all()
+        # filtered_characters = session.query(Character).filter(
+        #     func.json_extract(Character.profile, "$.ArmoryProfile.CharacterClassName")
+        #     == "리퍼"
+        # ).all()
 
         # PostgreSQL
-        # filtered_characters = session.query(Character).filter(
-        #     Character.profile["ArmoryProfile"]["CharacterClassName"].astext == "리퍼"
-        # ).all()
+        filtered_characters = session.query(Character).filter(
+            Character.profile["ArmoryProfile"]["CharacterClassName"] == "리퍼"
+        ).all()
         print(f"  🔍 모든 캐릭터의 직업:")
         for char in filtered_characters:
             armory = char.profile.get("ArmoryProfile", {})
