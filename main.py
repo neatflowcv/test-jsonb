@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, func
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
@@ -110,11 +110,18 @@ def jsonb_query_examples(session):
     # 3. JSON 경로를 이용한 쿼리 (데이터베이스별 호환성 고려)
     print("\n3️⃣ JSON 경로 쿼리 예제:")
     try:
-        # PostgreSQL JSONB 쿼리 (SQLite에서는 작동하지 않을 수 있음)
+        # SQLite
+        filtered_characters = session.query(Character).filter(
+            func.json_extract(Character.profile, "$.ArmoryProfile.CharacterClassName")
+            == "리퍼"
+        ).all()
 
-        # 모든 캐릭터의 직업 정보만 추출
-        print("  🔍 모든 캐릭터의 직업:")
-        for char in characters:
+        # PostgreSQL
+        # filtered_characters = session.query(Character).filter(
+        #     Character.profile["ArmoryProfile"]["CharacterClassName"].astext == "리퍼"
+        # ).all()
+        print(f"  🔍 모든 캐릭터의 직업:")
+        for char in filtered_characters:
             armory = char.profile.get("ArmoryProfile", {})
             char_name = armory.get("CharacterName", char.name)
             char_class = armory.get("CharacterClassName", "Unknown")
